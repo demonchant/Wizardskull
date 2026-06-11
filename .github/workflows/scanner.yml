@@ -73,20 +73,17 @@ jobs:
           fetch-depth: 1
 
       # ── 2. Set up Python ─────────────────────────────────
+      # No cache: "pip" — scanner is pure stdlib, no requirements.txt exists
       - name: "🐍 Set up Python 3.11"
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      # ── 3. Install dependencies ──────────────────────────
-      - name: "📦 Install dependencies"
+      # ── 3. Verify stdlib modules ─────────────────────────
+      - name: "📦 Verify Python stdlib"
         run: |
-          python -m pip install --upgrade pip
-          # All stdlib — no extra packages needed for the scanner
-          # Add any future deps here:
-          # pip install requests python-telegram-bot pandas
-          echo "✅ Dependencies ready (stdlib only)"
+          python --version
+          python -c "import urllib.request, json, csv, hashlib, logging, time, os, sys; print('✅ All stdlib modules ready')"
 
       # ── 4. Restore cached state ──────────────────────────
       - name: "♻️  Restore signal state cache"
@@ -267,4 +264,4 @@ jobs:
           print("=" * 50)
           print("  ✅ Health check complete")
           PYEOF
-
+          
