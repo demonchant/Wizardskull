@@ -4,8 +4,8 @@ import datetime
 import os
 import time
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "YOUR_CHAT_ID_HERE")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 ASSETS = ["XRPUSDT", "ETHUSDT", "SOLUSDT", "TONUSDT"]
 BTC_SYMBOL = "BTCUSDT"
@@ -93,10 +93,11 @@ def scan_asset(asset):
     price = asset_4h['close'].iloc[-1]
     
     long_score = 0
+    
     if btc_4h['close'].iloc[-1] > calc_ema(btc_4h['close'], 20).iloc[-1]:
         long_score += 1
-    if btc_1d['close'].iloc[-1] > calc_ema(btc_1d['close'], 20).iloc[-1]:
-        long_score += 1    if btc_3d['close'].iloc[-1] > calc_ema(btc_3d['close'], 20).iloc[-1]:
+    if btc_1d['close'].iloc[-1] > calc_ema(btc_1d['close'], 20).iloc[-1]:        long_score += 1
+    if btc_3d['close'].iloc[-1] > calc_ema(btc_3d['close'], 20).iloc[-1]:
         long_score += 1
         
     macd, signal = calc_macd(btc_4h)
@@ -122,6 +123,7 @@ def scan_asset(asset):
         long_score += 1
 
     short_score = 0
+    
     if btc_4h['close'].iloc[-1] < calc_ema(btc_4h['close'], 20).iloc[-1]:
         short_score += 1
     if btc_1d['close'].iloc[-1] < calc_ema(btc_1d['close'], 20).iloc[-1]:
@@ -143,8 +145,8 @@ def scan_asset(asset):
         short_score += 1
     if oi_delta > 0:
         short_score += 1
-    if ls_ratio > 1.05:
-        short_score += 1
+    if ls_ratio > 1.05:        short_score += 1
+
     return long_score, short_score, price, funding, oi_delta, ls_ratio
 
 def send_telegram_alert(message):
@@ -192,9 +194,9 @@ def main():
                 tp1_price = price * 0.9783
                 liq_price = price * 1.022
                 liq_status = "Longs > Shorts (Long Squeeze Imminent)" if ls_ratio > 1.05 else "Shorts > Longs"
-                
-                message = (
-                    f"🚨 *WIZARD SKULL ALERT* 🚨\n\n"                    f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
+                                message = (
+                    f"🚨 *WIZARD SKULL ALERT* 🚨\n\n"
+                    f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
                     f"Score: *{short_score}/10*\n"
                     f"Bias: *SHORT ENTRY (LOCKED)* 🎯\n\n"
                     f"BTC Regime: *Bearish* (3D · 1D · 4H KDJ + MACD + EMA aligned)\n\n"
