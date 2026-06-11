@@ -43,7 +43,7 @@ TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # Score gate — only fire alert if total >= this
-SCORE_THRESHOLD  = 9          # out of 10
+SCORE_THRESHOLD  = 7          # out of 10
 # Leverage used for TP/SL calculations (display only)
 LEVERAGE         = 46
 MAINT_MARGIN     = 0.005      # 0.5% isolated maintenance margin
