@@ -170,23 +170,22 @@ def main():
                 liq_price = price * 0.978
                 liq_status = "Shorts > Longs (Squeeze Potential)" if ls_ratio < 1.0 else "Longs > Shorts"
                 
-                message = (
-                    f"🚨 *WIZARD SKULL ALERT* 🚨\n\n"
-                    f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
-                    f"Score: *{long_score}/10*\n"
-                    f"Bias: *LONG ENTRY (LOCKED)* 🎯\n\n"
-                    f"BTC Regime: *Bullish* (3D · 1D · 4H KDJ + MACD + EMA aligned)\n\n"
-                    f"🎯 TP1 — 100% at 46x (+2.17%) → `{tp1_price:.4f}`\n"
-                    f"🎯 TP2 — Extended target\n"
-                    f"⚠️ STOP LOSS — set above liq!\n"
-                    f"💀 LIQ PRICE (isolated) — *~{liq_price:.4f}*\n\n"
-                    f"🚨 *SL IS BELOW LIQ PRICE — YOU WILL BE LIQUIDATED BEFORE SL TRIGGERS!*\n\n"
-                    f"⚡ *Futures Intelligence:*\n"
-                    f"📈 Funding Rates (8H): *{funding:.4f}%*\n"
-                    f"📊 Open Interest Δ (24H): *{oi_delta:.2f}%*\n"
-                    f"💥 Liquidation Cluster: *{liq_status}*\n\n"
-                    f"_⚠️ Always manage your risk. Monitor position manually._"
-                )
+                message = "🚨 *WIZARD SKULL ALERT* 🚨\n\n"
+                message += f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
+                message += f"Score: *{long_score}/10*\n"
+                message += "Bias: *LONG ENTRY (LOCKED)* 🎯\n\n"
+                message += "BTC Regime: *Bullish* (3D · 1D · 4H KDJ + MACD + EMA aligned)\n\n"
+                message += f"🎯 TP1 — 100% at 46x (+2.17%) → `{tp1_price:.4f}`\n"
+                message += "🎯 TP2 — Extended target\n"
+                message += "⚠️ STOP LOSS — set above liq!\n"
+                message += f"💀 LIQ PRICE (isolated) — *~{liq_price:.4f}*\n\n"
+                message += "🚨 *SL IS BELOW LIQ PRICE — YOU WILL BE LIQUIDATED BEFORE SL TRIGGERS!*\n\n"
+                message += "⚡ *Futures Intelligence:*\n"
+                message += f"📈 Funding Rates (8H): *{funding:.4f}%*\n"
+                message += f"📊 Open Interest Δ (24H): *{oi_delta:.2f}%*\n"
+                message += f"💥 Liquidation Cluster: *{liq_status}*\n\n"
+                message += "_⚠️ Always manage your risk. Monitor position manually._"
+                
                 send_telegram_alert(message)
                 print(f"🚨 LONG ALERT SENT FOR {asset}!")
                 
@@ -194,23 +193,22 @@ def main():
                 tp1_price = price * 0.9783
                 liq_price = price * 1.022
                 liq_status = "Longs > Shorts (Long Squeeze Imminent)" if ls_ratio > 1.05 else "Shorts > Longs"
-                                message = (
-                    f"🚨 *WIZARD SKULL ALERT* 🚨\n\n"
-                    f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
-                    f"Score: *{short_score}/10*\n"
-                    f"Bias: *SHORT ENTRY (LOCKED)* 🎯\n\n"
-                    f"BTC Regime: *Bearish* (3D · 1D · 4H KDJ + MACD + EMA aligned)\n\n"
-                    f"🎯 TP1 — 100% at 46x (-2.17%) → `{tp1_price:.4f}`\n"
-                    f"🎯 TP2 — Extended target\n"
-                    f"⚠️ STOP LOSS — set below liq!\n"
-                    f"💀 LIQ PRICE (isolated) — *~{liq_price:.4f}*\n\n"
-                    f"🚨 *SL IS ABOVE LIQ PRICE — YOU WILL BE LIQUIDATED BEFORE SL TRIGGERS!*\n\n"
-                    f"⚡ *Futures Intelligence:*\n"
-                    f"📈 Funding Rates (8H): *{funding:.4f}%*\n"
-                    f"📊 Open Interest Δ (24H): *{oi_delta:.2f}%*\n"
-                    f"💥 Liquidation Cluster: *{liq_status}*\n\n"
-                    f"_⚠️ Always manage your risk. Monitor position manually._"
-                )
+                
+                message = "🚨 *WIZARD SKULL ALERT* 🚨\n\n"                message += f"Asset: *{asset.replace('USDT', '/USDT')}*\n"
+                message += f"Score: *{short_score}/10*\n"
+                message += "Bias: *SHORT ENTRY (LOCKED)* 🎯\n\n"
+                message += "BTC Regime: *Bearish* (3D · 1D · 4H KDJ + MACD + EMA aligned)\n\n"
+                message += f"🎯 TP1 — 100% at 46x (-2.17%) → `{tp1_price:.4f}`\n"
+                message += "🎯 TP2 — Extended target\n"
+                message += "⚠️ STOP LOSS — set below liq!\n"
+                message += f"💀 LIQ PRICE (isolated) — *~{liq_price:.4f}*\n\n"
+                message += "🚨 *SL IS ABOVE LIQ PRICE — YOU WILL BE LIQUIDATED BEFORE SL TRIGGERS!*\n\n"
+                message += "⚡ *Futures Intelligence:*\n"
+                message += f"📈 Funding Rates (8H): *{funding:.4f}%*\n"
+                message += f"📊 Open Interest Δ (24H): *{oi_delta:.2f}%*\n"
+                message += f"💥 Liquidation Cluster: *{liq_status}*\n\n"
+                message += "_⚠️ Always manage your risk. Monitor position manually._"
+                
                 send_telegram_alert(message)
                 print(f"🚨 SHORT ALERT SENT FOR {asset}!")
                 
