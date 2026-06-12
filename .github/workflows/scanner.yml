@@ -1,4 +1,4 @@
-          name: WizardSkull Elite Signal Engine
+name: WizardSkull Elite Signal Engine
 
 on:
   schedule:
@@ -216,12 +216,12 @@ jobs:
 
           MESSAGE="${STATUS_ICON} *WizardSkull Scanner Heartbeat*
 
-🕒 ${TS}
-⚙️ Status: ${STATUS_TEXT}
-📈 BTC Regime: ${REGIME}
-${SIGNAL_LINE}
-🔁 Next scan: ~4h
-🔗 [Run details](${RUN_URL})"
+          🕒 ${TS}
+          ⚙️ Status: ${STATUS_TEXT}
+          📈 BTC Regime: ${REGIME}
+          ${SIGNAL_LINE}
+          🔁 Next scan: ~4h
+          🔗 [Run details](${RUN_URL})"
 
           if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
