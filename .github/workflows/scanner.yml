@@ -1,4 +1,4 @@
-name: WizardSkull Elite Signal Engine
+          name: WizardSkull Elite Signal Engine
 
 on:
   schedule:
@@ -189,7 +189,55 @@ jobs:
             echo "✅ Logs committed to repo"
           fi
 
-      # ── 11. Job summary ──────────────────────────────────
+      # ── 11. Telegram heartbeat — ALWAYS sent ─────────────
+      - name: "💓 Telegram heartbeat"
+        if: always()
+        env:
+          SCAN_RESULT: ${{ job.status }}
+        run: |
+          FIRED="${{ steps.scanner.outputs.signals_fired || '0' }}"
+          REGIME="${{ steps.scanner.outputs.regime || 'UNKNOWN' }}"
+          TS=$(date -u '+%Y-%m-%d %H:%M UTC')
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$SCAN_RESULT" = "success" ]; then
+            STATUS_ICON="✅"
+            STATUS_TEXT="Online"
+          else
+            STATUS_ICON="⚠️"
+            STATUS_TEXT="Scan job ended with status: ${SCAN_RESULT}"
+          fi
+
+          if [ "$FIRED" -gt 0 ] 2>/dev/null; then
+            SIGNAL_LINE="🔔 ${FIRED} signal(s) fired this run"
+          else
+            SIGNAL_LINE="😴 No signals this run — scanning continues"
+          fi
+
+          MESSAGE="${STATUS_ICON} *WizardSkull Scanner Heartbeat*
+
+🕒 ${TS}
+⚙️ Status: ${STATUS_TEXT}
+📈 BTC Regime: ${REGIME}
+${SIGNAL_LINE}
+🔁 Next scan: ~4h
+🔗 [Run details](${RUN_URL})"
+
+          if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ -n "${TELEGRAM_CHAT_ID}" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_CHAT_ID}" \
+              -d parse_mode="Markdown" \
+              -d disable_web_page_preview="true" \
+              --data-urlencode text="${MESSAGE}" \
+              -o telegram_heartbeat_response.json
+
+            echo "Telegram heartbeat response:"
+            cat telegram_heartbeat_response.json || true
+          else
+            echo "⚠️ TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set — heartbeat skipped"
+          fi
+
+      # ── 12. Job summary ──────────────────────────────────
       - name: "📋 Write job summary"
         if: always()
         run: |
@@ -207,6 +255,7 @@ jobs:
           | BTC Regime | $REGIME |
           | Signals Fired | $FIRED |
           | Score Threshold | 7/10 |
+          | Telegram Heartbeat | ✅ Sent |
 
           ### Assets Monitored
           \`XRP/USDT\` · \`ETH/USDT\` · \`SOL/USDT\` · \`TON/USDT\`
@@ -218,6 +267,10 @@ jobs:
           The scanner ran successfully. No asset reached 7/10 this cycle.
           This is **normal** — the system only fires on high-confidence setups.
           Check back at the next scheduled run (every 4 hours).
+
+          ### What the heartbeat means
+          A Telegram message is sent on **every** run — signal or not —
+          so you always know the scanner executed and is alive.
           SUMMARY
 
           # Print scan log to console for visibility
@@ -384,6 +437,7 @@ jobs:
           | BTC regime | $REGIME |
           | Signals this run | $FIRED |
           | Scanner | ✅ Running |
+          | Telegram heartbeat | ✅ Sent every run |
           | Schedule | Every 4 hours |
 
           ### Telegram Setup
@@ -394,4 +448,9 @@ jobs:
           ### ℹ️ 0 signals is normal
           The engine only fires when 7 of 10 conditions align simultaneously.
           If BTC is SIDEWAYS all entries are blocked by the regime filter.
+
+          ### 💓 Heartbeat
+          A separate Telegram heartbeat message is sent on every run
+          (regardless of signals) so you always know the system is alive.
           SUMMARY
+          
