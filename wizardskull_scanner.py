@@ -899,6 +899,21 @@ def run_scan():
             f"verdict={score_data['verdict']}"
         )
 
+        # ── Debug: per-condition breakdown ──────────────────
+        bd = score_data["breakdown"]
+        breakdown_str = "  ".join(
+            f"{k}:{'PASS' if v['pass'] else 'fail'}" for k, v in bd.items()
+        )
+        log.info(f"    [{score}/10] {breakdown_str}")
+        log.info(
+            f"    KDJ  3D_J={score_data['kdj_3d']['J']:.1f}  "
+            f"1D_J={score_data['kdj_1d']['J']:.1f}  "
+            f"4H_J={score_data['kdj_4h']['J']:.1f}  "
+            f"4H_MACD_hist={score_data['macd_4h']['hist']:.5f}  "
+            f"price={price}  ema21_4h={score_data['ema21_4h']}  "
+            f"ema50_4h={score_data['ema50_4h']}"
+        )
+
         if score < SCORE_THRESHOLD:
             log.info(f"  {asset}: score {score} < threshold {SCORE_THRESHOLD} — not firing")
             continue
