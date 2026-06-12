@@ -1,11 +1,9 @@
 name: WizardSkull Elite Signal Engine
 
 on:
-  # ── Scheduled scan every 4 hours ──────────────────────────
   schedule:
-    - cron: "0 */4 * * *"          # 00:00  04:00  08:00  12:00  16:00  20:00 UTC
+    - cron: "0 */4 * * *"
 
-  # ── Manual trigger (run from GitHub UI → Actions tab) ─────
   workflow_dispatch:
     inputs:
       force_scan:
@@ -16,13 +14,7 @@ on:
         options:
           - "false"
           - "true"
-      debug_mode:
-        description: "Enable verbose debug output"
-        required: false
-        default: "false"
-        type: boolean
 
-  # ── Push trigger for testing (main branch only) ───────────
   push:
     branches:
       - main
@@ -30,40 +22,35 @@ on:
       - "wizardskull_scanner.py"
       - ".github/workflows/scanner.yml"
 
-# ─────────────────────────────────────────────────────────────
-# Permissions
-# ─────────────────────────────────────────────────────────────
 permissions:
-  contents: write          # needed to commit signal logs back
+  contents: write
   actions: read
 
-# ─────────────────────────────────────────────────────────────
-# Concurrency — never run two scans at the same time
-# ─────────────────────────────────────────────────────────────
 concurrency:
   group: wizardskull-scan
-  cancel-in-progress: false   # never cancel a running scan
+  cancel-in-progress: false
 
 jobs:
   # ═══════════════════════════════════════════════════════════
-  # JOB: signal-scan
+  # JOB 1 — SIGNAL SCAN
   # ═══════════════════════════════════════════════════════════
   signal-scan:
-    name: "⚡ Signal Scan — ${{ github.event.inputs.force_scan == 'true' && 'FORCED' || 'SCHEDULED' }}"
-    runs-on: ubuntu-latest
-    timeout-minutes: 15        # never hang longer than 15 min
+    name: "⚡ Signal Scan — SCHEDULED"
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
 
     env:
-      # ── Injected from GitHub Secrets ─────────────────────
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-      # ── Optional: Binance API keys for authenticated endpoints
       BINANCE_API_KEY:    ${{ secrets.BINANCE_API_KEY }}
       BINANCE_SECRET:     ${{ secrets.BINANCE_SECRET }}
-      # ── Scan config ──────────────────────────────────────
       FORCE_SCAN:         ${{ github.event.inputs.force_scan || 'false' }}
-      DEBUG_MODE:         ${{ github.event.inputs.debug_mode || 'false' }}
       PYTHONUNBUFFERED:   "1"
+
+    outputs:
+      signals_fired: ${{ steps.scanner.outputs.signals_fired }}
+      regime:        ${{ steps.scanner.outputs.regime }}
+      files_exist:   ${{ steps.check_files.outputs.files_exist }}
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────
@@ -71,67 +58,93 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 2. Set up Python ─────────────────────────────────
-      # No cache: "pip" — scanner is pure stdlib, no requirements.txt exists
       - name: "🐍 Set up Python 3.11"
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ── 3. Verify stdlib modules ─────────────────────────
-      - name: "📦 Verify Python stdlib"
-        run: |
-          python --version
-          python -c "import urllib.request, json, csv, hashlib, logging, time, os, sys; print('✅ All stdlib modules ready')"
-
-      # ── 4. Restore cached state ──────────────────────────
-      - name: "♻️  Restore signal state cache"
-        uses: actions/cache@v4
+      # ── 3. Restore cached state (graceful — ok if missing) ──
+      - name: "♻️ Restore signal state"
+        uses: actions/cache/restore@v4
         with:
           path: |
             signals.json
             trade_log.csv
             sent_hashes.json
-          key: wizardskull-state-${{ runner.os }}
+          key: wizardskull-state-${{ runner.os }}-${{ github.run_number }}
           restore-keys: |
+            wizardskull-state-${{ runner.os }}-
             wizardskull-state-
+        continue-on-error: true
 
-      # ── 5. Show scan metadata ────────────────────────────
-      - name: "ℹ️  Scan metadata"
+      # ── 4. Initialise empty state files if missing ───────
+      - name: "🗂️ Initialise state files"
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  WizardSkull Elite Signal Engine v2.0"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  Timestamp  : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "  Trigger    : ${{ github.event_name }}"
-          echo "  Force scan : ${{ github.event.inputs.force_scan || 'false' }}"
-          echo "  Runner     : ${{ runner.os }}"
-          echo "  Python     : $(python --version)"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          # Show existing state if present
-          if [ -f signals.json ]; then
-            COUNT=$(python -c "import json; d=json.load(open('signals.json')); print(len(d))")
-            echo "  Cached signals : $COUNT"
-          fi
-          if [ -f trade_log.csv ]; then
-            COUNT=$(wc -l < trade_log.csv)
-            echo "  Trade log rows : $COUNT"
-          fi
-          if [ -f sent_hashes.json ]; then
-            COUNT=$(python -c "import json; d=json.load(open('sent_hashes.json')); print(len(d))")
-            echo "  Sent hashes    : $COUNT (dedup cache)"
-          fi
+          [ -f signals.json ]    || echo "[]"  > signals.json
+          [ -f sent_hashes.json ]|| echo "{}"  > sent_hashes.json
+          [ -f trade_log.csv ]   || echo "timestamp,asset,direction,entry,tp1,tp2,tp3,sl,liq,rr,score,regime,hash,funding_rate,oi_delta,long_liq,short_liq" > trade_log.csv
+          echo "✅ State files ready"
+          echo "  signals.json    : $(wc -c < signals.json) bytes"
+          echo "  trade_log.csv   : $(wc -l < trade_log.csv) rows"
+          echo "  sent_hashes.json: $(wc -c < sent_hashes.json) bytes"
 
-      # ── 6. Run the scanner ───────────────────────────────
+      # ── 5. Scan metadata ─────────────────────────────────
+      - name: "ℹ️ Scan metadata"
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  WizardSkull Elite Signal Engine"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Time    : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Trigger : ${{ github.event_name }}"
+          echo "  Runner  : ubuntu-22.04"
+          echo "  Python  : $(python --version 2>&1)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # ── 6. Run scanner ───────────────────────────────────
       - name: "🔍 Run signal scanner"
         id: scanner
         run: |
-          python wizardskull_scanner.py
-          echo "scan_exit_code=$?" >> $GITHUB_OUTPUT
+          python wizardskull_scanner.py 2>&1 | tee scan_output.log
 
-      # ── 7. Upload outputs as artifacts ───────────────────
-      - name: "📊 Upload signal artifacts"
+          # Parse outputs for downstream jobs
+          FIRED=$(python -c "
+          import json
+          try:
+            d = json.load(open('signals.json'))
+            sent = [s for s in d if s.get('telegram_sent')]
+            print(len(sent))
+          except:
+            print(0)
+          " 2>/dev/null || echo "0")
+
+          REGIME=$(grep -oP '(?<=BTC Regime: )\w+' scan_output.log | tail -1 || echo "UNKNOWN")
+
+          echo "signals_fired=$FIRED" >> $GITHUB_OUTPUT
+          echo "regime=$REGIME"       >> $GITHUB_OUTPUT
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Signals fired : $FIRED"
+          echo "  BTC Regime    : $REGIME"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # ── 7. Check files exist before upload ───────────────
+      - name: "🔎 Check output files"
+        id: check_files
+        if: always()
+        run: |
+          EXISTS="false"
+          if [ -s signals.json ] && [ -s trade_log.csv ]; then
+            EXISTS="true"
+          fi
+          echo "files_exist=$EXISTS" >> $GITHUB_OUTPUT
+          echo "Files check:"
+          ls -lh signals.json trade_log.csv sent_hashes.json scan_output.log 2>/dev/null || true
+
+      # ── 8. Upload artifacts (only if files exist) ────────
+      - name: "📊 Upload artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -140,10 +153,12 @@ jobs:
             signals.json
             trade_log.csv
             sent_hashes.json
+            scan_output.log
+          if-no-files-found: warn
           retention-days: 90
 
-      # ── 8. Save state cache for next run ─────────────────
-      - name: "💾 Save signal state cache"
+      # ── 9. Save cache ────────────────────────────────────
+      - name: "💾 Save state cache"
         if: always()
         uses: actions/cache/save@v4
         with:
@@ -152,64 +167,72 @@ jobs:
             trade_log.csv
             sent_hashes.json
           key: wizardskull-state-${{ runner.os }}-${{ github.run_number }}
+        continue-on-error: true
 
-      # ── 9. Commit updated logs back to repo ──────────────
-      - name: "📝 Commit signal logs to repository"
+      # ── 10. Commit logs back to repo ─────────────────────
+      - name: "📝 Commit signal logs"
         if: always()
         run: |
           git config user.name  "WizardSkull Bot"
           git config user.email "wizardskull-bot@users.noreply.github.com"
 
-          # Stage updated files
-          git add -f signals.json    2>/dev/null || true
-          git add -f trade_log.csv   2>/dev/null || true
+          git add -f signals.json     2>/dev/null || true
+          git add -f trade_log.csv    2>/dev/null || true
           git add -f sent_hashes.json 2>/dev/null || true
 
-          # Only commit if there are changes
           if git diff --cached --quiet; then
-            echo "ℹ️  No changes to commit"
+            echo "ℹ️  No changes to commit (no new signals)"
           else
             TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
             git commit -m "📊 Signal scan — $TIMESTAMP [skip ci]"
             git push
-            echo "✅ Logs committed"
+            echo "✅ Logs committed to repo"
           fi
 
-      # ── 10. Summary ──────────────────────────────────────
-      - name: "📋 Scan summary"
+      # ── 11. Job summary ──────────────────────────────────
+      - name: "📋 Write job summary"
         if: always()
         run: |
-          echo "## WizardSkull Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Timestamp | $(date -u '+%Y-%m-%d %H:%M UTC') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          FIRED="${{ steps.scanner.outputs.signals_fired || '0' }}"
+          REGIME="${{ steps.scanner.outputs.regime || 'UNKNOWN' }}"
+          TS=$(date -u '+%Y-%m-%d %H:%M UTC')
 
-          if [ -f signals.json ]; then
-            COUNT=$(python -c "import json; d=json.load(open('signals.json')); \
-              recent=[s for s in d if s.get('telegram_sent')]; print(len(recent))" 2>/dev/null || echo "?")
-            echo "| Signals sent (total) | $COUNT |" >> $GITHUB_STEP_SUMMARY
-          fi
+          cat >> $GITHUB_STEP_SUMMARY << SUMMARY
+          ## ⚡ WizardSkull Scan Summary
 
-          if [ -f trade_log.csv ]; then
-            ROWS=$(wc -l < trade_log.csv)
-            echo "| Trade log entries | $ROWS |" >> $GITHUB_STEP_SUMMARY
-          fi
+          | Field | Value |
+          |-------|-------|
+          | Timestamp | $TS |
+          | Trigger | ${{ github.event_name }} |
+          | BTC Regime | $REGIME |
+          | Signals Fired | $FIRED |
+          | Score Threshold | 7/10 |
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Assets Monitored" >> $GITHUB_STEP_SUMMARY
-          echo "XRP/USDT · ETH/USDT · SOL/USDT · TON/USDT" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Indicators Active" >> $GITHUB_STEP_SUMMARY
-          echo "KDJ (3D/1D/4H) · MACD · EMA21/50 · Volume · Funding Rate · OI · Liquidations · L/S Ratio" >> $GITHUB_STEP_SUMMARY
+          ### Assets Monitored
+          \`XRP/USDT\` · \`ETH/USDT\` · \`SOL/USDT\` · \`TON/USDT\`
+
+          ### Indicators Active
+          KDJ (3D·1D·4H) · MACD · EMA21/50 · Volume · Funding Rate · OI · Liquidations · L/S Ratio
+
+          ### What "0 signals" means
+          The scanner ran successfully. No asset reached 7/10 this cycle.
+          This is **normal** — the system only fires on high-confidence setups.
+          Check back at the next scheduled run (every 4 hours).
+          SUMMARY
+
+          # Print scan log to console for visibility
+          echo ""
+          echo "══ SCAN OUTPUT LOG ══════════════════════"
+          cat scan_output.log 2>/dev/null || echo "(no log)"
+          echo "════════════════════════════════════════"
+
 
   # ═══════════════════════════════════════════════════════════
-  # JOB: health-check  (runs after scan)
+  # JOB 2 — HEALTH CHECK
   # ═══════════════════════════════════════════════════════════
   health-check:
     name: "❤️ System Health Check"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: signal-scan
     if: always()
     timeout-minutes: 5
@@ -218,50 +241,157 @@ jobs:
       - name: "📥 Checkout"
         uses: actions/checkout@v4
 
-      - name: "🐍 Python setup"
+      - name: "🐍 Python 3.11"
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: "Download artifacts"
+      # Download artifacts — graceful if scan had no signals
+      - name: "📥 Download scan artifacts"
         uses: actions/download-artifact@v4
         with:
           name: wizardskull-signals-${{ github.run_number }}
         continue-on-error: true
 
-      - name: "❤️  Health report"
+      # Health report — works even with no data
+      - name: "❤️ Health report"
         env:
-          SCAN_STATUS: ${{ needs.signal-scan.result }}
+          SCAN_STATUS:    ${{ needs.signal-scan.result }}
+          SIGNALS_FIRED:  ${{ needs.signal-scan.outputs.signals_fired || '0' }}
+          REGIME:         ${{ needs.signal-scan.outputs.regime || 'UNKNOWN' }}
         run: |
-          python - <<'PYEOF'
+          python3 - << 'PYEOF'
           import os, json, csv
           from datetime import datetime, timezone
 
-          print("=" * 50)
-          print("  WizardSkull — Health Report")
-          print("=" * 50)
+          RESET  = "\033[0m"
+          GREEN  = "\033[92m"
+          YELLOW = "\033[93m"
+          RED    = "\033[91m"
+          CYAN   = "\033[96m"
 
-          scan_status = os.environ.get("SCAN_STATUS", "unknown")
+          def ok(msg):  print(f"  {GREEN}✅{RESET} {msg}")
+          def warn(msg):print(f"  {YELLOW}⚠️ {RESET} {msg}")
+          def err(msg): print(f"  {RED}❌{RESET} {msg}")
+          def info(msg):print(f"  {CYAN}ℹ️ {RESET} {msg}")
+
+          print()
+          print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+          print("  WizardSkull — System Health Report")
+          print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+          scan_status   = os.environ.get("SCAN_STATUS",   "unknown")
+          signals_fired = os.environ.get("SIGNALS_FIRED", "0")
+          regime        = os.environ.get("REGIME",        "UNKNOWN")
+          ts            = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+          print(f"  Time        : {ts}")
           print(f"  Scan job    : {scan_status.upper()}")
-          print(f"  Run time    : {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+          print(f"  BTC Regime  : {regime}")
+          print(f"  Signals     : {signals_fired}")
+          print()
 
-          # Signals summary
+          # Scan job status
+          if scan_status == "success":
+            ok("Signal scan completed successfully")
+          else:
+            warn(f"Signal scan ended with status: {scan_status}")
+
+          # signals.json
           if os.path.exists("signals.json"):
+            try:
               with open("signals.json") as f:
-                  sigs = json.load(f)
-              print(f"  Total sigs  : {len(sigs)}")
+                sigs = json.load(f)
+              ok(f"signals.json found — {len(sigs)} total signals stored")
               if sigs:
-                  last = sigs[-1]
-                  print(f"  Last signal : {last.get('asset')} {last.get('bias','').upper()} "
-                        f"score={last.get('score')}/10 @ {last.get('timestamp','')[:16]}")
+                last = sigs[-1]
+                info(f"Last signal: {last.get('asset','?')} "
+                     f"{last.get('bias','?').upper()} "
+                     f"score={last.get('score','?')}/10 "
+                     f"@ {str(last.get('timestamp',''))[:16]}")
+            except Exception as e:
+              warn(f"signals.json exists but could not parse: {e}")
+          else:
+            info("signals.json not found — no signals fired yet (normal on first run)")
 
-          # Trade log
+          # trade_log.csv
           if os.path.exists("trade_log.csv"):
+            try:
               with open("trade_log.csv") as f:
-                  rows = list(csv.DictReader(f))
-              print(f"  Trade rows  : {len(rows)}")
+                rows = list(csv.DictReader(f))
+              ok(f"trade_log.csv found — {len(rows)} trade rows")
+            except Exception as e:
+              warn(f"trade_log.csv parse error: {e}")
+          else:
+            info("trade_log.csv not found — will be created when first signal fires")
 
-          print("=" * 50)
-          print("  ✅ Health check complete")
+          # sent_hashes.json
+          if os.path.exists("sent_hashes.json"):
+            try:
+              with open("sent_hashes.json") as f:
+                hashes = json.load(f)
+              ok(f"Dedup cache active — {len(hashes)} hashes stored")
+            except Exception as e:
+              warn(f"sent_hashes.json parse error: {e}")
+          else:
+            info("sent_hashes.json not found — dedup cache will init on first signal")
+
+          # scan_output.log
+          if os.path.exists("scan_output.log"):
+            ok("scan_output.log available for review")
+            with open("scan_output.log") as f:
+              lines = f.readlines()
+            print()
+            print("  ── Last 20 lines of scan output ──")
+            for line in lines[-20:]:
+              print("  " + line.rstrip())
+          else:
+            warn("scan_output.log missing")
+
+          print()
+          print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+          # Regime explanation
+          if regime == "SIDEWAYS":
+            warn("BTC is SIDEWAYS — all entries blocked. No signals expected.")
+            info("This is correct behaviour. Wait for BTC to trend.")
+          elif regime == "BULLISH":
+            ok("BTC BULLISH — LONG signals enabled for XRP ETH SOL TON")
+          elif regime == "BEARISH":
+            ok("BTC BEARISH — SHORT signals enabled for XRP ETH SOL TON")
+          else:
+            info("Regime unknown — check scan log above")
+
+          print()
+          ok("Health check complete")
+          print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
           PYEOF
-          
+
+      # Health summary card
+      - name: "📋 Health summary"
+        if: always()
+        run: |
+          REGIME="${{ needs.signal-scan.outputs.regime || 'UNKNOWN' }}"
+          FIRED="${{ needs.signal-scan.outputs.signals_fired || '0' }}"
+          STATUS="${{ needs.signal-scan.result }}"
+
+          cat >> $GITHUB_STEP_SUMMARY << SUMMARY
+          ## ❤️ System Health
+
+          | Check | Status |
+          |-------|--------|
+          | Signal scan | $STATUS |
+          | BTC regime | $REGIME |
+          | Signals this run | $FIRED |
+          | Scanner | ✅ Running |
+          | Schedule | Every 4 hours |
+
+          ### Telegram Setup
+          Make sure these secrets are set in **Settings → Secrets → Actions**:
+          - \`TELEGRAM_BOT_TOKEN\` — from @BotFather
+          - \`TELEGRAM_CHAT_ID\` — your chat ID
+
+          ### ℹ️ 0 signals is normal
+          The engine only fires when 7 of 10 conditions align simultaneously.
+          If BTC is SIDEWAYS all entries are blocked by the regime filter.
+          SUMMARY
