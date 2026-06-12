@@ -88,7 +88,7 @@ HASH_FILE      = "sent_hashes.json"
 # ─────────────────────────────────────────────────────────────
 # BINANCE REST HELPERS
 # ─────────────────────────────────────────────────────────────
-BASE_SPOT    = "https://api.binance.com"
+BASE_SPOT    = "https://data-api.binance.vision"
 BASE_FUTURES = "https://fapi.binance.com"
 
 def _get(url: str, timeout: int = 10) -> Optional[dict | list]:
@@ -603,7 +603,6 @@ def calc_trade_levels(entry: float, bias: str) -> dict:
         "liq":   round(liq,  6),
         "rr":    round(rr,   2),
     }
-
 
 
 # ─────────────────────────────────────────────────────────────
