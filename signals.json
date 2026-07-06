@@ -1,1 +1,57 @@
-[]
+[
+  {
+    "timestamp": "2026-07-06T21:40:19.585838+00:00",
+    "asset": "AVAX",
+    "bias": "short",
+    "price": 6.984,
+    "score": 7,
+    "verdict": "PREPARE",
+    "regime": "BEARISH",
+    "levels": {
+      "entry": 6.984,
+      "tp1": 6.832168,
+      "tp2": 6.66972,
+      "tp3": 6.42528,
+      "sl": 7.135832,
+      "liq": 7.100906,
+      "rr": 2.07
+    },
+    "futures": {
+      "funding_rate": null,
+      "next_funding": null,
+      "oi_current": null,
+      "oi_delta_pct": null,
+      "long_liq_usd": 0.0,
+      "short_liq_usd": 0.0,
+      "ls_ratio": null,
+      "futures_score": 0,
+      "futures_bias": "neutral"
+    },
+    "kdj_3d": {
+      "K": 62.5,
+      "D": 40.19,
+      "J": 107.12,
+      "cross": "none"
+    },
+    "kdj_1d": {
+      "K": 83.21,
+      "D": 81.32,
+      "J": 86.99,
+      "cross": "none"
+    },
+    "kdj_4h": {
+      "K": 65.6,
+      "D": 56.6,
+      "J": 83.59,
+      "cross": "none"
+    },
+    "macd_4h": {
+      "dif": 0.047654,
+      "dea": 0.053117,
+      "hist": -0.005463,
+      "trend": "bearish"
+    },
+    "hash": "73fefb731c93f565",
+    "telegram_sent": true
+  }
+]

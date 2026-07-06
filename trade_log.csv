@@ -1,1 +1,2 @@
 timestamp,asset,direction,entry,tp1,tp2,tp3,sl,liq,rr,score,regime,hash,funding_rate,oi_delta,long_liq,short_liq
+2026-07-06T21:40:19.585838+00:00,AVAX,short,6.984,6.832168,6.66972,6.42528,7.135832,7.100906,2.07,7,BEARISH,73fefb731c93f565,,,0.0,0.0
